@@ -4,7 +4,7 @@ import sys
 import glob
 import time
 import numpy as np
-from utils import check_nq
+from utils import *
 # ------------------------------------------------------------------
 # Run triality cluster simulation of Potts model for canonical heavy-dense QCD
 
@@ -19,6 +19,7 @@ nx = int(sys.argv[1])
 ny = int(sys.argv[2])
 nz = int(sys.argv[3])
 vol = nx * ny * nz
+Ndir = 6                    # Number of directions (forward and backward)
 NB = int(sys.argv[4])       # Number of baryons
 nq = 3 * NB                 # Number of quarks
 gamma = float(sys.argv[5])
@@ -50,13 +51,15 @@ site = [('x', np.int), ('y', np.int), ('z', np.int)]
 #   An occupation number (counting quarks, not baryons)
 #   Six booleans to tell whether or not bonds are present
 #   A pointer to the site at the root of its cluster
-# If NB > volume, start with full lattice and remove NB baryons
+# We start with vol single-site clusters
+# This requires (0, 3, 6) quarks at each site
+# If NB > vol, start with full lattice and remove (2vol - NB) baryons
 # Otherwise start with empty lattice and add NB baryons
 if NB > vol:
   occupation = np.full((nx, ny, nz), 6, dtype=np.uint)
 else:
   occupation = np.zeros((nx, ny, nz), dtype=np.uint)
-bond = np.zeros((nx, ny, nz, 6), dtype=bool)        # All False
+bond = np.zeros((nx, ny, nz, Ndir), dtype=bool)        # All False
 root = np.empty((nx, ny, nz), dtype=site)
 
 for i, j, k in np.ndindex((nx, ny, nz)):
@@ -90,15 +93,83 @@ else:                       # Add NB baryons to empty lattice
         occupation[ran_x][ran_y][ran_z] += 3
         success = True
 
+# Pack constant information into single variable for passing to subroutines
+lattice = dict({'nx': nx, 'ny': ny, 'nz': nz, 'Ndir': Ndir,
+                'nq': nq, 'prng': prng})
+
 # Check for successful layout
-check_nq(occupation, nq)
+check_nq(occupation, lattice)
 # ------------------------------------------------------------------
 
 
 
 # ------------------------------------------------------------------
-# Sweeps!
-#for traj_done in range(Nsweep):
-  # TODO: Update
+# Open files for output
+ACCEPT = open(outdir + '/accept.csv', 'w')
+MAXFRAC = open(outdir + '/maxfrac.csv', 'w')
+NUMCLUSTERS = open(outdir + '/numclusters.csv', 'w')
+
+# Loop over sweeps, measuring after each one
+for sweep in range(Nsweep):
+  # Each sweep loops (randomly) over the lattice volume
+  for i in range(vol):
+    # --------------------------------------------------------------
+    # Update step 1: Try to move full baryon to neighboring site
+    ran_x = prng.randint(0, nx)
+    ran_y = prng.randint(0, ny)
+    ran_z = prng.randint(0, nz)
+
+    # Check that we have a baryon to move
+    if occupation[ran_x][ran_y][ran_z] > 2:
+      # Choose random neighbor and see if it can accept the baryon
+      new_x, new_y, new_z = get_neighbor(ran_x, ran_y, ran_z, lattice)
+      if occupation[new_x][new_y][new_z] < 4:
+        occupation[ran_x][ran_y][ran_z] -= 3
+        occupation[new_x][new_y][new_z] += 3
+        print >> ACCEPT, 1,
+      else:
+        print >> ACCEPT, 0,
+    else:
+      print >> ACCEPT, 0,
+    # --------------------------------------------------------------
+
+
+
+    # --------------------------------------------------------------
+    # Update step 2: Try to move quark within cluster
+    ran_x = prng.randint(0, nx)
+    ran_y = prng.randint(0, ny)
+    ran_z = prng.randint(0, nz)
+    ran_dir = prng.randint(0, Ndir)
+    # Check whether 
+    print >> ACCEPT, 0,
+    # --------------------------------------------------------------
+
+
+
+    # --------------------------------------------------------------
+    # Update step 3: Try to change bond
+    ran_x = prng.randint(0, nx)
+    ran_y = prng.randint(0, ny)
+    ran_z = prng.randint(0, nz)
+    print >> ACCEPT, 0
+    # --------------------------------------------------------------
+
+
+
+    # --------------------------------------------------------------
+    # Check sanity of new configuration
+    # Can be omitted to speed up computations
+    check_nq(occupation, lattice)
+
   # TODO: Measure
+# ------------------------------------------------------------------
+
+
+# ------------------------------------------------------------------
+# Clean up and close down
+MAXFRAC.close()
+NUMCLUSTERS.close
+
+# TODO: Utilities for saving bond configuration and occupation numbers...
 # ------------------------------------------------------------------
