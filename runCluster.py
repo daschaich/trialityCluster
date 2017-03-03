@@ -8,9 +8,10 @@ from utils import *
 # ------------------------------------------------------------------
 # Run triality cluster simulation of Potts model for canonical heavy-dense QCD
 
-# Parse arguments: 3d lattice volume, Potts coupling gamma,
+# Parse arguments: 3d lattice volume,
 # canonical sector in terms of number of (three-quark) baryons,
-# number of sweeps to do, directory for output data
+# Potts coupling gamma, number of sweeps to do, RNG seed
+# and directory for output data
 if len(sys.argv) < 9:
   print "Usage:", str(sys.argv[0]), "<nx> <ny> <nz> <#baryons>"
   print "                     <gamma> <sweeps> <RNG seed> <output dir>"
@@ -24,11 +25,13 @@ Ndir = 6                      # Number of directions (forward and backward)
 NB = np.uint(sys.argv[4])     # Number of baryons
 nq = 3 * NB                   # Number of quarks
 gamma = float(sys.argv[5])
+exp_mga = np.exp(-gamma)      # Only compute this once
 Nsweep = np.uint(sys.argv[6])
 seed = int(sys.argv[7])
 outdir = sys.argv[8]
 runtime = -time.time()
 
+# TODO: Utilities for loading bond configuration and occupation numbers...
 # Create output directory if it doesn't exist already
 if not os.path.isdir(outdir):
   print "Creating directory", outdir, "for output"
@@ -46,7 +49,7 @@ if NB > 2 * vol:
   print "aborting"
   sys.exit(1)
 
-# Seed random number generator
+# Seed (Mersenne Twister) random number generator
 # Use RandomState instead of (global) seed
 # in case multiple independent streams may be needed in the future
 prng = np.random.RandomState(seed)
@@ -89,7 +92,7 @@ root = np.arange(vol, dtype=np.uint)            # root[i] = i
 # size of largest cluster, total numbers of clusters and bonds
 aveCluster = 1.0 / float(vol)
 maxCluster = 1.0 / float(vol)
-numBonds = np.uint(0)
+numBond = np.uint(0)
 numCluster = vol
 
 # Initialize quark configuration as described above
@@ -123,6 +126,17 @@ ACCEPT = open(outdir + '/accept.csv', 'w')
 MAXCLUSTER = open(outdir + '/maxcluster.csv', 'w')
 AVECLUSTER = open(outdir + '/avecluster.csv', 'w')
 NUMBONDS = open(outdir + '/numbonds.csv', 'w')
+ACTION = open(outdir + '/action.csv', 'w')
+
+# Print starting state
+count_clusters(root, numCluster, MAXCLUSTER)
+print >> AVECLUSTER, float(vol) / float(numCluster),
+print >> AVECLUSTER, 1.0 / float(numCluster)
+print >> NUMBONDS, float(numBond) / float(vol * Ndim)
+if not gamma == 0:
+  print >> ACTION, float(numBond) / (1.0 - exp_mga)
+else:
+  print >> ACTION, 0.0
 
 # Loop over sweeps, printing some basic data after each one
 for sweep in range(Nsweep):
@@ -157,8 +171,8 @@ for sweep in range(Nsweep):
       if occupation[new] < 6:
         # See whether or not both sites are in the same cluster
         if get_root(root, ran) == get_root(root, new):
-          occupation[ran] -= 1
-          occupation[new] += 1
+          occupation[ran] -= np.uint(1)
+          occupation[new] += np.uint(1)
           print >> ACCEPT, 1,
         else:
           print >> ACCEPT, 0,
@@ -176,17 +190,74 @@ for sweep in range(Nsweep):
     ran = prng.randint(0, vol)
     ran_dir = prng.randint(0, Ndim)
 
-    # If bond is present, try to remove it
+    # Figure out the site on the other side of the bond
+    neigh = follow_bond(ran, ran_dir, lattice)
+
+    # If the bond is present, try to remove it
     if bond[ran][ran_dir]:
-      #TODO
-      pass
+      bond[ran][ran_dir] = False      # Consequences to be checked...
 
-    # If bond is not present, try to add it
+      # Build cluster from ran, see if neigh is still in it
+      # TODO: Should be a cheaper way just to check connectivity
+      #       without building entire cluster
+      ran_cluster = []
+      build_cluster(bond, ran, ran_cluster, lattice)
+      if neigh in ran_cluster:        # No change in clusters, so accept
+        numBond -= np.uint(1)
+        print >> ACCEPT, 1
+
+      # If the cluster will be split we need to check the occupation numbers
+      else:
+        ran_nq = check_occupation(occupation, ran_cluster)
+        if not np.mod(ran_nq, 3) == 0:
+          bond[ran][ran_dir] = True       # Reject!
+          print >> ACCEPT, 0
+
+        else:   # Accept with probability 3 * exp_mga / (1 + 2 * exp_mga)
+                # (We already know that the other occupation number is fine)
+          if prng.uniform(0, 1) < 3.0 * exp_mga / (1.0 + 2.0 * exp_mga):
+            print >> ACCEPT, 1
+            numBond -= np.uint(1)
+            numCluster += np.uint(1)
+
+            # Build new cluster and reset roots
+            neigh_cluster = []
+            build_cluster(bond, neigh, neigh_cluster, lattice)
+            for i in ran_cluster:
+              root[i] = ran
+            for i in neigh_cluster:
+              root[i] = neigh
+
+          else:   # The final reject!
+            bond[ran][ran_dir] = True       # Reject!
+            print >> ACCEPT, 0
+
+    # If the bond is not present, try to add it
     else:
-      #TODO
-      pass
+      ran_root = get_root(root, ran)
+      neigh_root = get_root(root, neigh)
+      # If both sites are already in the same cluster,
+      # then add bond with probability (1 - exp_mga)
+      if ran_root == neigh_root:
+        if prng.uniform(0, 1) < 1.0 - exp_mga:
+          bond[ran][ran_dir] = True
+          numBond += np.uint(1)
+          print >> ACCEPT, 1
+        else:
+          print >> ACCEPT, 0
 
-    print >> ACCEPT, 0
+      # Otherwise the addition decreases the number of clusters by one,
+      # and so occurs with probability (1 - exp_mga) / (1 + 2 * exp_mga)
+      else:
+        if prng.uniform(0, 1) < (1.0 - exp_mga) / (1.0 + 2.0 * exp_mga):
+          bond[ran][ran_dir] = True
+          numBond += np.uint(1)
+          numCluster -= np.uint(1)
+          root[neigh_root] = ran_root         # Merge clusters
+          print >> ACCEPT, 1
+        else:
+          print >> ACCEPT, 0
+    # --------------------------------------------------------------
 
   # Print some basic data after each sweep
   # (Can also run after each update if speed is not an issue)
@@ -197,12 +268,22 @@ for sweep in range(Nsweep):
   # count_clusters prints size of largest cluster
   count_clusters(root, numCluster, MAXCLUSTER)
 
-  # Print average cluster size as fraction of total volume
+  # Print average cluster size, both absolute and as fraction of total volume
+  print >> AVECLUSTER, float(vol) / float(numCluster),
   print >> AVECLUSTER, 1.0 / float(numCluster)
 
   # Make sure our count of bonds remains correct
-  count_bonds(bond, numBonds)
-  print >> NUMBONDS, numBonds
+  count_bonds(bond, numBond)
+
+  # Print number of bonds as fraction of the total
+  print >> NUMBONDS, float(numBond) / float(vol * Ndim)
+
+  # Print action as total number of bonds divided by (1 - exp_mga)
+  # Note that numBond = 0 when gamma = 0
+  if not gamma == 0:
+    print >> ACTION, float(numBond) / (1.0 - exp_mga)
+  else:
+    print >> ACTION, 0.0
 # ------------------------------------------------------------------
 
 
@@ -213,6 +294,7 @@ ACCEPT.close()
 MAXCLUSTER.close()
 AVECLUSTER.close()
 NUMBONDS.close()
+ACTION.close()
 
 # TODO: Utilities for saving bond configuration and occupation numbers...
 

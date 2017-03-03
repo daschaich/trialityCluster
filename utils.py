@@ -16,7 +16,7 @@ def site_index(x, y, z, lattice):
 
 
 # ------------------------------------------------------------------
-# Randomly choose neighboring site
+# Randomly choose neighboring site in either direction
 # Use MILC ordering conventions for directions
 def get_neighbor(site, lattice):
   new_x = lattice['x'][site]
@@ -41,6 +41,30 @@ def get_neighbor(site, lattice):
   new_y = np.uint(np.mod(new_y, lattice['ny']))
   new_z = np.uint(np.mod(new_z, lattice['nz']))
   return np.uint(site_index(new_x, new_y, new_z, lattice))
+
+# Figure out the site on the other side of the given bond
+def follow_bond(site, bond, lattice):
+  new_x = lattice['x'][site]
+  new_y = lattice['y'][site]
+  new_z = lattice['z'][site]
+  if bond == 0:
+    new_x += 1
+  elif bond == 1:
+    new_y += 1
+  elif bond == 2:
+    new_z += 1
+  elif bond == 3:
+    new_x -= 1
+  elif bond == 4:
+    new_y -= 1
+  elif bond == 5:
+    new_z -= 1
+
+  # Keep new site within proper range of lattice volume
+  new_x = np.uint(np.mod(new_x, lattice['nx']))
+  new_y = np.uint(np.mod(new_y, lattice['ny']))
+  new_z = np.uint(np.mod(new_z, lattice['nz']))
+  return np.uint(site_index(new_x, new_y, new_z, lattice))
 # ------------------------------------------------------------------
 
 
@@ -50,12 +74,19 @@ def get_neighbor(site, lattice):
 def check_nq(occupation, nq):
   tot = np.uint(0)        # Set proper type
   for i in range(len(occupation)):
-#    print "occupation[%d] = %d" % (i, occupation[i])
     tot += occupation[i]
-#  print tot
+
   if not tot == nq:
     print "ERROR: Counted", tot, "rather than", nq, "quarks... aborting"
     sys.exit(1)
+
+# Much like above, only now looking count in given cluster
+def check_occupation(occupation, cluster):
+  tot = np.uint(0)        # Set proper type
+  for i in cluster:
+    tot += occupation[i]
+
+  return tot
 # ------------------------------------------------------------------
 
 
@@ -75,7 +106,7 @@ def get_root(root, site):
 
 # ------------------------------------------------------------------
 # Determine sizes of all clusters, printing size of largest
-def count_clusters(root, numClusters, MAXCLUSTER):
+def count_clusters(root, numCluster, MAXCLUSTER):
   # Can have up to len(root) clusters -- maybe more than we need
   clusters = np.zeros(len(root), dtype=np.uint)
   for i in range(len(root)):
@@ -90,18 +121,20 @@ def count_clusters(root, numClusters, MAXCLUSTER):
           % (np.sum(clusters), len(root))
     sys.exit(1)
 
-  # Count total number of clusters and check against numClusters
-  tot = np.uint(0)
+  # Count total number of clusters and check against numCluster
+  tot = 0
+  tot = np.uint(tot)        # Set proper type
   for i in range(len(root)):
     if clusters[i] > 0:
-      tot += 1
+      tot += np.uint(1)
 
-  if not tot == numClusters:
-    print "ERROR: Counted", tot, "rather than", numClusters, "clusters...",
+  if not tot == numCluster:
+    print "ERROR: Counted", tot, "rather than", numCluster, "clusters...",
     print "aborting"
     sys.exit(1)
 
-  # Print largest cluster size as fraction of total volume
+  # Print largest cluster size, both absolute and as fraction of total volume
+  print >> MAXCLUSTER, np.amax(clusters),
   print >> MAXCLUSTER, np.amax(clusters) / float(len(root))
 # ------------------------------------------------------------------
 
@@ -114,8 +147,34 @@ def count_bonds(bond, numBonds):
   for i, mu in np.ndindex(bond.shape):
     if bond[i][mu]:
       tot += 1
+
   if not tot == numBonds:
     print "ERROR: Counted", tot, "rather than", numBonds, "bonds...",
     print "aborting"
     sys.exit(1)
+# ------------------------------------------------------------------
+
+
+
+# ------------------------------------------------------------------
+# Build cluster by following all bonds from starting site
+def build_cluster(bond, start, cluster, lattice):
+  # Add starting site
+  cluster.append(start)
+
+  # Recursively visit all neighbors of starting site
+  # that are not yet in the cluster
+  # Forward directions
+  for direction in range(lattice['Ndim']):
+    if bond[start][direction]:
+      tovisit = follow_bond(start, direction, lattice)
+      if not tovisit in cluster:
+        build_cluster(bond, tovisit, cluster, lattice)
+
+  # Backward directions -- need to check bonds at neighboring sites
+  for direction in range(lattice['Ndim']):
+    tocheck = follow_bond(start, 3 + direction, lattice)
+    if bond[tocheck][direction]:
+      if not tocheck in cluster:
+        build_cluster(bond, tocheck, cluster, lattice)
 # ------------------------------------------------------------------
