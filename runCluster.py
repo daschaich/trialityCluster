@@ -15,22 +15,29 @@ if len(sys.argv) < 9:
   print "Usage:", str(sys.argv[0]), "<nx> <ny> <nz> <#baryons>"
   print "                     <gamma> <sweeps> <RNG seed> <output dir>"
   sys.exit(1)
-nx = int(sys.argv[1])
-ny = int(sys.argv[2])
-nz = int(sys.argv[3])
+nx = np.uint(sys.argv[1])
+ny = np.uint(sys.argv[2])
+nz = np.uint(sys.argv[3])
 vol = nx * ny * nz
-Ndir = 6                    # Number of directions (forward and backward)
-NB = int(sys.argv[4])       # Number of baryons
-nq = 3 * NB                 # Number of quarks
+Ndim = 3                      # Number of dimension
+Ndir = 6                      # Number of directions (forward and backward)
+NB = np.uint(sys.argv[4])     # Number of baryons
+nq = 3 * NB                   # Number of quarks
 gamma = float(sys.argv[5])
-Nsweep = int(sys.argv[6])
+Nsweep = np.uint(sys.argv[6])
 seed = int(sys.argv[7])
 outdir = sys.argv[8]
+runtime = -time.time()
 
 # Create output directory if it doesn't exist already
 if not os.path.isdir(outdir):
   print "Creating directory", outdir, "for output"
   os.makedirs(outdir)
+
+# Save run parameters for posterity
+PARAMS = open(outdir + '/params.csv', 'w')
+print >> PARAMS, ' '.join(sys.argv)
+PARAMS.close()
 
 # Quick sanity check: Make sure all NB baryons can fit on the lattice
 if NB > 2 * vol:
@@ -38,37 +45,52 @@ if NB > 2 * vol:
   print nx, "x", ny, "x", nz, "lattice...",
   print "aborting"
   sys.exit(1)
+
+# Seed random number generator
+# Use RandomState instead of (global) seed
+# in case multiple independent streams may be needed in the future
+prng = np.random.RandomState(seed)
 # ------------------------------------------------------------------
 
 
 
 # ------------------------------------------------------------------
 # Set up lattice
-# Basic structure: Site as list of three coordinates
-site = [('x', np.int), ('y', np.int), ('z', np.int)]
+# First define arrays to store (x, y, z) indices of each site
+x = np.empty(vol, dtype=np.uint)
+y = np.empty(vol, dtype=np.uint)
+z = np.empty(vol, dtype=np.uint)
+for i, j, k in np.ndindex((nx, ny, nz)):
+  index = np.uint(i + nx * (j + ny * k))
+  x[index] = i
+  y[index] = j
+  z[index] = k
 
-# For each site we need the following:
+# Pack constant information into single variable for passing to subroutines
+lattice = dict({'nx': nx, 'ny': ny, 'nz': nz, 'Ndim': Ndim, 'Ndir': Ndir,
+                'vol': vol, 'nq': nq, 'prng': prng, 'x': x, 'y': y, 'z': z})
+
+# Now for each site we need the following:
 #   An occupation number (counting quarks, not baryons)
-#   Six booleans to tell whether or not bonds are present
+#   Ndim booleans to tell whether or not bonds are present
 #   A pointer to the site at the root of its cluster
 # We start with vol single-site clusters
-# This requires (0, 3, 6) quarks at each site
+# This requires {0, 3, 6} quarks at each site
 # If NB > vol, start with full lattice and remove (2vol - NB) baryons
 # Otherwise start with empty lattice and add NB baryons
 if NB > vol:
-  occupation = np.full((nx, ny, nz), 6, dtype=np.uint)
+  occupation = np.full(vol, 6, dtype=np.uint)
 else:
-  occupation = np.zeros((nx, ny, nz), dtype=np.uint)
-bond = np.zeros((nx, ny, nz, Ndir), dtype=bool)        # All False
-root = np.empty((nx, ny, nz), dtype=site)
+  occupation = np.zeros(vol, dtype=np.uint)
+bond = np.zeros((vol, Ndim), dtype=bool)        # All False
+root = np.arange(vol, dtype=np.uint)            # root[i] = i
 
-for i, j, k in np.ndindex((nx, ny, nz)):
-  root[i][j][k] = (i, j, k)
-
-# Seed random number generator
-# Use RandomState instead of (global) seed
-# in case multiple independent streams may be needed in the future
-prng = np.random.RandomState(seed)
+# Some gross features of configuration: Average cluster size,
+# size of largest cluster, total numbers of clusters and bonds
+aveCluster = 1.0 / float(vol)
+maxCluster = 1.0 / float(vol)
+numBonds = np.uint(0)
+numCluster = vol
 
 # Initialize quark configuration as described above
 # Either add or remove baryons at randomly chosen sites
@@ -76,29 +98,21 @@ if NB > vol:                # Remove (2vol - NB) baryons from full lattice
   for i in range(2 * vol - NB):
     success = False         # Keep trying until success!
     while not success:
-      ran_x = prng.randint(0, nx)
-      ran_y = prng.randint(0, ny)
-      ran_z = prng.randint(0, nz)
-      if occupation[ran_x][ran_y][ran_z] > 2:
-        occupation[ran_x][ran_y][ran_z] -= 3
+      ran = prng.randint(0, vol)
+      if occupation[ran] > 2:
+        occupation[ran] -= 3
         success = True
 else:                       # Add NB baryons to empty lattice
   for i in range(NB):
     success = False
     while not success:
-      ran_x = prng.randint(0, nx)
-      ran_y = prng.randint(0, ny)
-      ran_z = prng.randint(0, nz)
-      if occupation[ran_x][ran_y][ran_z] < 4:
-        occupation[ran_x][ran_y][ran_z] += 3
+      ran = prng.randint(0, vol)
+      if occupation[ran] < 4:
+        occupation[ran] += 3
         success = True
 
-# Pack constant information into single variable for passing to subroutines
-lattice = dict({'nx': nx, 'ny': ny, 'nz': nz, 'Ndir': Ndir,
-                'nq': nq, 'prng': prng})
-
-# Check for successful layout
-check_nq(occupation, lattice)
+# Check that layout was successful
+check_nq(occupation, nq)
 # ------------------------------------------------------------------
 
 
@@ -106,26 +120,24 @@ check_nq(occupation, lattice)
 # ------------------------------------------------------------------
 # Open files for output
 ACCEPT = open(outdir + '/accept.csv', 'w')
-MAXFRAC = open(outdir + '/maxfrac.csv', 'w')
-NUMCLUSTERS = open(outdir + '/numclusters.csv', 'w')
+MAXCLUSTER = open(outdir + '/maxcluster.csv', 'w')
+AVECLUSTER = open(outdir + '/avecluster.csv', 'w')
+NUMBONDS = open(outdir + '/numbonds.csv', 'w')
 
-# Loop over sweeps, measuring after each one
+# Loop over sweeps, printing some basic data after each one
 for sweep in range(Nsweep):
   # Each sweep loops (randomly) over the lattice volume
   for i in range(vol):
     # --------------------------------------------------------------
     # Update step 1: Try to move full baryon to neighboring site
-    ran_x = prng.randint(0, nx)
-    ran_y = prng.randint(0, ny)
-    ran_z = prng.randint(0, nz)
-
     # Check that we have a baryon to move
-    if occupation[ran_x][ran_y][ran_z] > 2:
+    ran = prng.randint(0, vol)
+    if occupation[ran] > 2:
       # Choose random neighbor and see if it can accept the baryon
-      new_x, new_y, new_z = get_neighbor(ran_x, ran_y, ran_z, lattice)
-      if occupation[new_x][new_y][new_z] < 4:
-        occupation[ran_x][ran_y][ran_z] -= 3
-        occupation[new_x][new_y][new_z] += 3
+      new = get_neighbor(ran, lattice)
+      if occupation[new] < 4:
+        occupation[ran] -= 3
+        occupation[new] += 3
         print >> ACCEPT, 1,
       else:
         print >> ACCEPT, 0,
@@ -137,39 +149,73 @@ for sweep in range(Nsweep):
 
     # --------------------------------------------------------------
     # Update step 2: Try to move quark within cluster
-    ran_x = prng.randint(0, nx)
-    ran_y = prng.randint(0, ny)
-    ran_z = prng.randint(0, nz)
-    ran_dir = prng.randint(0, Ndir)
-    # Check whether 
-    print >> ACCEPT, 0,
+    # Check that we have a quark to move
+    ran = prng.randint(0, vol)
+    if occupation[ran] > 0:
+      # Choose random neighbor and see if it can accept the quark
+      new = get_neighbor(ran, lattice)
+      if occupation[new] < 6:
+        # See whether or not both sites are in the same cluster
+        if get_root(root, ran) == get_root(root, new):
+          occupation[ran] -= 1
+          occupation[new] += 1
+          print >> ACCEPT, 1,
+        else:
+          print >> ACCEPT, 0,
+      else:
+        print >> ACCEPT, 0,
+
+    else:
+      print >> ACCEPT, 0,
     # --------------------------------------------------------------
 
 
 
     # --------------------------------------------------------------
     # Update step 3: Try to change bond
-    ran_x = prng.randint(0, nx)
-    ran_y = prng.randint(0, ny)
-    ran_z = prng.randint(0, nz)
+    ran = prng.randint(0, vol)
+    ran_dir = prng.randint(0, Ndim)
+
+    # If bond is present, try to remove it
+    if bond[ran][ran_dir]:
+      #TODO
+      pass
+
+    # If bond is not present, try to add it
+    else:
+      #TODO
+      pass
+
     print >> ACCEPT, 0
-    # --------------------------------------------------------------
 
+  # Print some basic data after each sweep
+  # (Can also run after each update if speed is not an issue)
+  # Sanity check: make sure our total occupation number remains correct
+  check_nq(occupation, nq)
 
+  # Make sure our count of clusters remains correct
+  # count_clusters prints size of largest cluster
+  count_clusters(root, numCluster, MAXCLUSTER)
 
-    # --------------------------------------------------------------
-    # Check sanity of new configuration
-    # Can be omitted to speed up computations
-    check_nq(occupation, lattice)
+  # Print average cluster size as fraction of total volume
+  print >> AVECLUSTER, 1.0 / float(numCluster)
 
-  # TODO: Measure
+  # Make sure our count of bonds remains correct
+  count_bonds(bond, numBonds)
+  print >> NUMBONDS, numBonds
 # ------------------------------------------------------------------
+
 
 
 # ------------------------------------------------------------------
 # Clean up and close down
-MAXFRAC.close()
-NUMCLUSTERS.close
+ACCEPT.close()
+MAXCLUSTER.close()
+AVECLUSTER.close()
+NUMBONDS.close()
 
 # TODO: Utilities for saving bond configuration and occupation numbers...
+
+runtime += time.time()
+print "Runtime: %0.1f seconds" % runtime
 # ------------------------------------------------------------------
