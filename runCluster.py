@@ -21,9 +21,9 @@ ny = np.uint(sys.argv[2])
 nz = np.uint(sys.argv[3])
 vol = nx * ny * nz
 Ndim = 3                      # Number of dimension
-Ndir = 6                      # Number of directions (forward and backward)
+Ndir = 2 * Ndim               # Number of directions (forward and backward)
 NB = np.uint(sys.argv[4])     # Number of baryons
-nq = 3 * NB                   # Number of quarks
+Nq = 3 * NB                   # Number of quarks
 gamma = float(sys.argv[5])
 exp_mga = np.exp(-gamma)      # Only compute this once
 Nsweep = np.uint(sys.argv[6])
@@ -32,6 +32,7 @@ outdir = sys.argv[8]
 runtime = -time.time()
 
 # TODO: Utilities for loading bond configuration and occupation numbers...
+
 # Create output directory if it doesn't exist already
 if not os.path.isdir(outdir):
   print "Creating directory", outdir, "for output"
@@ -71,7 +72,7 @@ for i, j, k in np.ndindex((nx, ny, nz)):
 
 # Pack constant information into single variable for passing to subroutines
 lattice = dict({'nx': nx, 'ny': ny, 'nz': nz, 'Ndim': Ndim, 'Ndir': Ndir,
-                'vol': vol, 'nq': nq, 'prng': prng, 'x': x, 'y': y, 'z': z})
+                'vol': vol, 'Nq': Nq, 'prng': prng, 'x': x, 'y': y, 'z': z})
 
 # Now for each site we need the following:
 #   An occupation number (counting quarks, not baryons)
@@ -115,7 +116,7 @@ else:                       # Add NB baryons to empty lattice
         success = True
 
 # Check that layout was successful
-check_nq(occupation, nq)
+check_Nq(occupation, Nq)
 # ------------------------------------------------------------------
 
 
@@ -208,8 +209,8 @@ for sweep in range(Nsweep):
 
       # If the cluster will be split we need to check the occupation numbers
       else:
-        ran_nq = check_occupation(occupation, ran_cluster)
-        if not np.mod(ran_nq, 3) == 0:
+        ran_Nq = check_occupation(occupation, ran_cluster)
+        if not np.mod(ran_Nq, 3) == 0:
           bond[ran][ran_dir] = True       # Reject!
           print >> ACCEPT, 0
 
@@ -262,7 +263,7 @@ for sweep in range(Nsweep):
   # Print some basic data after each sweep
   # (Can also run after each update if speed is not an issue)
   # Sanity check: make sure our total occupation number remains correct
-  check_nq(occupation, nq)
+  check_Nq(occupation, Nq)
 
   # Make sure our count of clusters remains correct
   # count_clusters prints size of largest cluster
@@ -275,15 +276,17 @@ for sweep in range(Nsweep):
   # Make sure our count of bonds remains correct
   count_bonds(bond, numBond)
 
-  # Print number of bonds as fraction of the total
-  print >> NUMBONDS, float(numBond) / float(vol * Ndim)
+  # Print number of bonds, both absolute and as fraction of the total
+  print >> NUMBONDS, numBond, float(numBond) / float(vol * Ndim)
 
   # Print action as total number of bonds divided by (1 - exp_mga)
+  # Again, first total action then average divided by total volume
   # Note that numBond = 0 when gamma = 0
   if not gamma == 0:
-    print >> ACTION, float(numBond) / (1.0 - exp_mga)
+    tr = float(numBond) / (1.0 - exp_mga)
+    print >> ACTION, tr, tr / float(vol)
   else:
-    print >> ACTION, 0.0
+    print >> ACTION, 0.0, 0.0
 # ------------------------------------------------------------------
 
 

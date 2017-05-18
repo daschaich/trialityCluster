@@ -70,14 +70,14 @@ def follow_bond(site, bond, lattice):
 
 
 # ------------------------------------------------------------------
-# Sanity check: Make sure sum of all occupation numbers equals nq
-def check_nq(occupation, nq):
+# Sanity check: Make sure sum of all occupation numbers equals Nq
+def check_Nq(occupation, Nq):
   tot = np.uint(0)        # Set proper type
   for i in range(len(occupation)):
     tot += occupation[i]
 
-  if not tot == nq:
-    print "ERROR: Counted", tot, "rather than", nq, "quarks... aborting"
+  if not tot == Nq:
+    print "ERROR: Counted", tot, "rather than", Nq, "quarks... aborting"
     sys.exit(1)
 
 # Much like above, only now looking count in given cluster
