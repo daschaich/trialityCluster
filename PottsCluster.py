@@ -25,11 +25,16 @@ Ndir = 2 * Ndim               # Number of directions (forward and backward)
 NB = np.uint(sys.argv[4])     # Number of baryons
 Nq = 3 * NB                   # Number of quarks
 gamma = float(sys.argv[5])
-exp_mga = np.exp(-gamma)      # Only compute this once
 Nsweep = np.uint(sys.argv[6])
 seed = int(sys.argv[7])
 outdir = sys.argv[8]
 runtime = -time.time()
+
+# Compute and save these constant floats
+exp_mga = np.exp(-gamma)
+add_prob = 1.0 - exp_mga
+split_prob = 3.0 * exp_mga / (1.0 + 2.0 * exp_mga)
+merge_prob = add_prob / (1.0 + 2.0 * exp_mga)
 
 # TODO: Utilities for loading bond configuration and occupation numbers...
 
@@ -41,7 +46,6 @@ if not os.path.isdir(outdir):
 # Save run parameters for posterity
 PARAMS = open(outdir + '/params.csv', 'w')
 print >> PARAMS, ' '.join(sys.argv)
-PARAMS.close()
 
 # Quick sanity check: Make sure all NB baryons can fit on the lattice
 if NB > 2 * vol:
@@ -135,9 +139,10 @@ print >> AVECLUSTER, float(vol) / float(numCluster),
 print >> AVECLUSTER, 1.0 / float(numCluster)
 print >> NUMBONDS, float(numBond) / float(vol * Ndim)
 if not gamma == 0:
-  print >> ACTION, float(numBond) / (1.0 - exp_mga)
+  tr = float(numBond) / add_prob
+  print >> ACTION, tr, tr
 else:
-  print >> ACTION, 0.0
+  print >> ACTION, 0.0, 0.0
 
 # Loop over sweeps, printing some basic data after each one
 for sweep in range(Nsweep):
@@ -216,7 +221,7 @@ for sweep in range(Nsweep):
 
         else:   # Accept with probability 3 * exp_mga / (1 + 2 * exp_mga)
                 # (We already know that the other occupation number is fine)
-          if prng.uniform(0, 1) < 3.0 * exp_mga / (1.0 + 2.0 * exp_mga):
+          if prng.uniform(0, 1) < split_prob:
             print >> ACCEPT, 1
             numBond -= np.uint(1)
             numCluster += np.uint(1)
@@ -240,7 +245,7 @@ for sweep in range(Nsweep):
       # If both sites are already in the same cluster,
       # then add bond with probability (1 - exp_mga)
       if ran_root == neigh_root:
-        if prng.uniform(0, 1) < 1.0 - exp_mga:
+        if prng.uniform(0, 1) < add_prob:
           bond[ran][ran_dir] = True
           numBond += np.uint(1)
           print >> ACCEPT, 1
@@ -250,7 +255,7 @@ for sweep in range(Nsweep):
       # Otherwise the addition decreases the number of clusters by one,
       # and so occurs with probability (1 - exp_mga) / (1 + 2 * exp_mga)
       else:
-        if prng.uniform(0, 1) < (1.0 - exp_mga) / (1.0 + 2.0 * exp_mga):
+        if prng.uniform(0, 1) < merge_prob:
           bond[ran][ran_dir] = True
           numBond += np.uint(1)
           numCluster -= np.uint(1)
@@ -283,7 +288,7 @@ for sweep in range(Nsweep):
   # Again, first total action then average divided by total volume
   # Note that numBond = 0 when gamma = 0
   if not gamma == 0:
-    tr = float(numBond) / (1.0 - exp_mga)
+    tr = float(numBond) / add_prob
     print >> ACTION, tr, tr / float(vol)
   else:
     print >> ACTION, 0.0, 0.0
@@ -303,4 +308,6 @@ ACTION.close()
 
 runtime += time.time()
 print "Runtime: %0.1f seconds" % runtime
+print >> PARAMS, "Runtime: %0.1f seconds" % runtime
+PARAMS.close()
 # ------------------------------------------------------------------
