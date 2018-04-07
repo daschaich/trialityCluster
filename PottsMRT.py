@@ -15,7 +15,7 @@ from utils import follow_bond
 # and directory for output data
 if len(sys.argv) < 8:
   print "Usage:", str(sys.argv[0]), "<nx> <ny> <nz>"
-  print "                     <gamma> <sweeps> <RNG seed> <output dir>"
+  print "                     <gamma> <sweeps> <RNG seed> <out_dir>"
   sys.exit(1)
 nx = np.uint(sys.argv[1])
 ny = np.uint(sys.argv[2])
@@ -40,7 +40,6 @@ if not os.path.isdir(outdir):
 # Save run parameters for posterity
 PARAMS = open(outdir + '/params.csv', 'w')
 print >> PARAMS, ' '.join(sys.argv)
-PARAMS.close()
 
 # Seed (Mersenne Twister) random number generator
 # Use RandomState instead of (global) seed
@@ -83,7 +82,7 @@ MAGNET = open(outdir + '/magnet.csv', 'w')
 ACTION = open(outdir + '/action.csv', 'w')
 
 # Print starting state
-# Note S = -gamma sum_<ij> \delta_{s_i, s_j}]
+# Note S = -gamma sum_<ij> \delta_{s_i, s_j}    # TODO: Check sign...
 tot_spin = -float(vol)      # Converts spins to (-1, 0, 1, ..., Nstate - 2)
 tot_act = 0.0
 for i in range(vol):
@@ -109,6 +108,7 @@ for sweep in range(Nsweep):
     new = prng.randint(0, Nstate)   # Proposed new state at site ran
 
     # Compute change in energy, if non-zero
+    # TODO: Might be able to do this more efficiently
     # With weight exp[-S] = exp[gamma sum_<ij> \delta_{s_i, s_j}]
     #   accept with probability exp[newE - curE]
     if new == cur:
@@ -161,4 +161,6 @@ ACTION.close()
 
 runtime += time.time()
 print "Runtime: %0.1f seconds" % runtime
+print >> PARAMS, "Runtime: %0.1f seconds" % runtime
+PARAMS.close()
 # ------------------------------------------------------------------
