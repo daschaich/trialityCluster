@@ -37,8 +37,8 @@ Each sweep does each of the following steps  `vol` times:
 The pseudorandom numbers are produced by NumPy's Mersenne Twister generator, initialized with the given `random_seed`.
 
 Output is written to the following standard files in the output directory `out_dir` (which is created if it does not yet exist):
-* `accept.csv` records acceptance (0 vs. 1) for each of the three update steps listed above on each of its `sweeps`x`vol` lines
-* `action.csv` records the (total and volume-averaged) Potts model action NB/(1-exp(-gamma)) after each sweep, where NB is the total number of bonds present in the lattice
+* `accept.csv` records the average acceptance for each of the three update steps listed above after each sweep
+* `action.csv` records the (total and volume-averaged) Potts model action `NB/(1-exp(-gamma))` after each sweep, where NB is the total number of bonds present in the lattice
 * `avecluster.csv` records the average size of each cluster after each sweep, in terms of both the number of sites and the fraction of the total volume
 * `maxcluster.csv` records the size of the largest cluster after each sweep, in terms of both the number of sites and the fraction of the total volume
 * `numbonds.csv` records the number of bonds in the lattice after each sweep, both the total number NB and the fraction of the maximum `Ndim`x`vol`
@@ -49,7 +49,7 @@ All of `accept.csv`, `action.csv`, `avecluster.csv`, `maxcluster.csv` and `numbo
 
 TODO:
 * Add routines to save and load configurations, appending to output files rather than overwriting them
-* Check zero-density results against local update algorithm
+* Check zero-density results against local update algorithm and against known location of phase transition
 * Reproduce results in arXiv:1712.07585 (will require additional update steps and/or reweighting)
 
 ## Local update algorithm for 3d three-state Potts model
@@ -70,13 +70,13 @@ First, we only work in the zero-quark canonical sector, to avoid the severe sign
 Second, each sweep over `vol` updates is much simpler.  Each update chooses a random site, sets its spin to a random value (which can be the same as it currently has), and runs the MRT accept/reject test.
 
 As above, output is written to the following standard files in the output directory `out_dir` (which is created if it does not yet exist):
-* `accept.csv` records acceptance (a single 0 vs. 1) for each of the `sweeps`x`vol` updates
-* `action.csv` records the (total and volume-averaged) Potts model action (gamma sum_<ij> \delta_{s_i, s_j}) after each sweep, where the sum is over all nearest-neighbor pairs of sites i and j
+* `accept.csv` records the average acceptance for each sweep
+* `action.csv` records the (total and volume-averaged) Potts model action (`gamma sum_<ij> delta_{s_i, s_j}`) after each sweep, where the sum is over all nearest-neighbor pairs of sites i and j
 * `magnet.csv` records the (total and volume-averaged) magnetization defined by assigning the three Potts states the numerical values {-1, 0, 1}
 * `params.csv` records the input parameters and total runtime for reference
 
 TODO:
-* Check against known coupling for phase transition
+* Check against known location of phase transition
 * Add routines to save and load configurations, appending to output files rather than overwriting them
 * Check against cluster algorithm (in particular checking gamma vs. -gamma since the two codes produce actions with opposite signs)
 

@@ -45,7 +45,7 @@ if not os.path.isdir(outdir):
 
 # Save run parameters for posterity
 PARAMS = open(outdir + '/params.csv', 'w')
-print >> PARAMS, ' '.join(sys.argv)
+print >> PARAMS, "python", ' '.join(sys.argv)
 
 # Quick sanity check: Make sure all NB baryons can fit on the lattice
 if NB > 2 * vol:
@@ -147,6 +147,7 @@ else:
 # Loop over sweeps, printing some basic data after each one
 for sweep in range(Nsweep):
   # Each sweep loops (randomly) over the lattice volume
+  accept = [0.0, 0.0, 0.0]        # Initialize acceptance rate
   for i in range(vol):
     # --------------------------------------------------------------
     # Update step 1: Try to move full baryon to neighboring site
@@ -158,11 +159,7 @@ for sweep in range(Nsweep):
       if occupation[new] < 4:
         occupation[ran] -= 3
         occupation[new] += 3
-        print >> ACCEPT, 1,
-      else:
-        print >> ACCEPT, 0,
-    else:
-      print >> ACCEPT, 0,
+        accept[0] += 1.0
     # --------------------------------------------------------------
 
 
@@ -179,14 +176,7 @@ for sweep in range(Nsweep):
         if get_root(root, ran) == get_root(root, new):
           occupation[ran] -= np.uint(1)
           occupation[new] += np.uint(1)
-          print >> ACCEPT, 1,
-        else:
-          print >> ACCEPT, 0,
-      else:
-        print >> ACCEPT, 0,
-
-    else:
-      print >> ACCEPT, 0,
+          accept[1] += 1.0
     # --------------------------------------------------------------
 
 
@@ -210,19 +200,18 @@ for sweep in range(Nsweep):
       build_cluster(bond, ran, ran_cluster, lattice)
       if neigh in ran_cluster:        # No change in clusters, so accept
         numBond -= np.uint(1)
-        print >> ACCEPT, 1
+        accept[2] += 1.0
 
       # If the cluster will be split we need to check the occupation numbers
       else:
         ran_Nq = check_occupation(occupation, ran_cluster)
         if not np.mod(ran_Nq, 3) == 0:
           bond[ran][ran_dir] = True       # Reject!
-          print >> ACCEPT, 0
 
         else:   # Accept with probability 3 * exp_mga / (1 + 2 * exp_mga)
                 # (We already know that the other occupation number is fine)
           if prng.uniform(0, 1) < split_prob:
-            print >> ACCEPT, 1
+            accept[2] += 1.0
             numBond -= np.uint(1)
             numCluster += np.uint(1)
 
@@ -236,7 +225,6 @@ for sweep in range(Nsweep):
 
           else:   # The final reject!
             bond[ran][ran_dir] = True       # Reject!
-            print >> ACCEPT, 0
 
     # If the bond is not present, try to add it
     else:
@@ -248,9 +236,7 @@ for sweep in range(Nsweep):
         if prng.uniform(0, 1) < add_prob:
           bond[ran][ran_dir] = True
           numBond += np.uint(1)
-          print >> ACCEPT, 1
-        else:
-          print >> ACCEPT, 0
+          accept[2] += 1.0
 
       # Otherwise the addition decreases the number of clusters by one,
       # and so occurs with probability (1 - exp_mga) / (1 + 2 * exp_mga)
@@ -260,13 +246,16 @@ for sweep in range(Nsweep):
           numBond += np.uint(1)
           numCluster -= np.uint(1)
           root[neigh_root] = ran_root         # Merge clusters
-          print >> ACCEPT, 1
-        else:
-          print >> ACCEPT, 0
+          accept[2] += 1.0
     # --------------------------------------------------------------
 
   # Print some basic data after each sweep
-  # (Can also run after each update if speed is not an issue)
+  # (Can also run after each update if speed and output size aren't issues)
+  # First print average acceptances for the sweep
+  print >> ACCEPT, "%.4g" % (accept[0] / float(vol)),
+  print >> ACCEPT, "%.4g" % (accept[1] / float(vol)),
+  print >> ACCEPT, "%.4g" % (accept[2] / float(vol))
+
   # Sanity check: make sure our total occupation number remains correct
   check_Nq(occupation, Nq)
 
@@ -275,21 +264,21 @@ for sweep in range(Nsweep):
   count_clusters(root, numCluster, MAXCLUSTER)
 
   # Print average cluster size, both absolute and as fraction of total volume
-  print >> AVECLUSTER, float(vol) / float(numCluster),
-  print >> AVECLUSTER, 1.0 / float(numCluster)
+  print >> AVECLUSTER, "%.8g" % (float(vol) / float(numCluster)),
+  print >> AVECLUSTER, "%.8g" % (1.0 / float(numCluster))
 
   # Make sure our count of bonds remains correct
   count_bonds(bond, numBond)
 
   # Print number of bonds, both absolute and as fraction of the total
-  print >> NUMBONDS, numBond, float(numBond) / float(vol * Ndim)
+  print >> NUMBONDS, "%d %.8g" % (numBond, float(numBond) / float(vol * Ndim))
 
   # Print action as total number of bonds divided by (1 - exp_mga)
   # Again, first total action then average divided by total volume
   # Note that numBond = 0 when gamma = 0
   if not gamma == 0:
     tr = float(numBond) / add_prob
-    print >> ACTION, tr, tr / float(vol)
+    print >> ACTION, "%.8g %.8g" % (tr, tr / float(vol))
   else:
     print >> ACTION, 0.0, 0.0
 # ------------------------------------------------------------------

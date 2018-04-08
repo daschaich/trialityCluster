@@ -39,7 +39,7 @@ if not os.path.isdir(outdir):
 
 # Save run parameters for posterity
 PARAMS = open(outdir + '/params.csv', 'w')
-print >> PARAMS, ' '.join(sys.argv)
+print >> PARAMS, "python", ' '.join(sys.argv)
 
 # Seed (Mersenne Twister) random number generator
 # Use RandomState instead of (global) seed
@@ -100,6 +100,7 @@ print >> ACTION, tot_act, tot_act / float(vol)
 # Loop over sweeps, printing some basic data after each one
 for sweep in range(Nsweep):
   # Each sweep loops (randomly) over the lattice volume
+  accept = 0.0                    # Initialize acceptance rate
   for i in range(vol):
     # Update: Try to change the state at the current site
     # The new state is allowed to be the current state
@@ -112,7 +113,7 @@ for sweep in range(Nsweep):
     # With weight exp[-S] = exp[gamma sum_<ij> \delta_{s_i, s_j}]
     #   accept with probability exp[newE - curE]
     if new == cur:
-      print >> ACCEPT, 1
+      accept += 1.0
     else:
       curE = 0.0
       newE = 0.0
@@ -125,12 +126,10 @@ for sweep in range(Nsweep):
 
       if newE > curE:
         config[ran] = new
-        print >> ACCEPT, 1
+        accept += 1.0
       elif prng.uniform(0, 1) < np.exp(newE - curE):
         config[ran] = new
-        print >> ACCEPT, 1
-      else:
-        print >> ACCEPT, 0
+        accept += 1.0
 
   # Print some basic data after each sweep
   # (Can also run after each update if speed is not an issue)
@@ -143,10 +142,11 @@ for sweep in range(Nsweep):
       if config[i] == neigh:
         tot_act -= gamma
 
-  # Print 'magnetization' and action,
+  # Print acceptance, 'magnetization' and action,
   # for each including both total and average over lattice volume
-  print >> MAGNET, tot_spin, tot_spin / float(vol)
-  print >> ACTION, tot_act, tot_act / float(vol)
+  print >> ACCEPT, "%.4g" % (accept / float(vol))
+  print >> MAGNET, "%d %.8g" % (tot_spin, tot_spin / float(vol))
+  print >> ACTION, "%d %.8g" % (tot_act, tot_act / float(vol))
 # ------------------------------------------------------------------
 
 
