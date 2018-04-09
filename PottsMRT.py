@@ -80,16 +80,16 @@ for i in range(vol):
 ACCEPT = open(outdir + '/accept.csv', 'w')
 print >> ACCEPT, "sweep,accept"
 MAGNET = open(outdir + '/magnet.csv', 'w')
-print >> MAGNET, "sweep,magnet_tot,magnet_rel"
+print >> MAGNET, "sweep,state1,state2,state3"
 ACTION = open(outdir + '/action.csv', 'w')
 print >> ACTION, "sweep,action_tot,action_rel"
 
 # Print starting state
 # Note S = -gamma sum_<ij> delta_{s_i, s_j}    # TODO: Check sign...
-tot_spin = -float(vol)      # Converts spins to (-1, 0, 1, ..., Nstate - 2)
+magnet = [0, 0, 0]
 tot_act = 0.0
 for i in range(vol):
-  tot_spin += config[i]
+  magnet[config[i]] += 1    # Count how many sites have each value
   for mu in range(Ndim):    # Only the forward neighbors
     neigh = config[follow_bond(i, mu, lattice)]
     if config[i] == neigh:
@@ -97,7 +97,10 @@ for i in range(vol):
 
 # Print 'magnetization' and action,
 # for each including both total and average over lattice volume
-print >> MAGNET, "0,%d,%.8g" % (tot_spin, tot_spin / float(vol))
+m1 = float(magnet[0]) / float(vol)
+m2 = float(magnet[1]) / float(vol)
+m3 = float(magnet[2]) / float(vol)
+print >> MAGNET, "0,%.8g,%.8g,%.8g" % (m1, m2, m3)
 print >> ACTION, "0,%.8g,%.8g" % (tot_act, tot_act / float(vol))
 
 # Loop over sweeps, printing some basic data after each one
@@ -136,10 +139,10 @@ for sweep in range(1, Nsweep + 1):
 
   # Print some basic data after each sweep
   # (Can also run after each update if speed is not an issue)
-  tot_spin = -float(vol)      # Converts spins to (-1, 0, 1, ..., Nstate - 2)
+  magnet = [0, 0, 0]
   tot_act = 0.0
   for i in range(vol):
-    tot_spin += config[i]
+    magnet[config[i]] += 1    # Count how many sites have each value
     for mu in range(Ndim):    # Only the forward neighbors
       neigh = config[follow_bond(i, mu, lattice)]
       if config[i] == neigh:
@@ -148,7 +151,10 @@ for sweep in range(1, Nsweep + 1):
   # Print acceptance, 'magnetization' and action,
   # for each including both total and average over lattice volume
   print >> ACCEPT, "%d,%.4g" % (sweep, accept / float(vol))
-  print >> MAGNET, "%d,%d,%.8g" % (sweep, tot_spin, tot_spin / float(vol))
+  m1 = float(magnet[0]) / float(vol)
+  m2 = float(magnet[1]) / float(vol)
+  m3 = float(magnet[2]) / float(vol)
+  print >> MAGNET, "%d,%.8g,%.8g,%.8g" % (sweep, m1, m2, m3)
   print >> ACTION, "%d,%.8g,%.8g" % (sweep, tot_act, tot_act / float(vol))
 # ------------------------------------------------------------------
 
