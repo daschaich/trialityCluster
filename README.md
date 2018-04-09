@@ -36,16 +36,18 @@ Each sweep does each of the following steps  `vol` times:
 
 The pseudorandom numbers are produced by NumPy's Mersenne Twister generator, initialized with the given `random_seed`.
 
-Output is written to the following standard files in the output directory `out_dir` (which is created if it does not yet exist):
+Output is written to the following files in the output directory `out_dir` (which is created if it does not yet exist):
 * `accept.csv` records the average acceptance for each of the three update steps listed above after each sweep
 * `action.csv` records the (total and volume-averaged) Potts model action `NB/(1-exp(-gamma))` after each sweep, where NB is the total number of bonds present in the lattice
 * `avecluster.csv` records the average size of each cluster after each sweep, in terms of both the number of sites and the fraction of the total volume
 * `maxcluster.csv` records the size of the largest cluster after each sweep, in terms of both the number of sites and the fraction of the total volume
 * `numbonds.csv` records the number of bonds in the lattice after each sweep, both the total number NB and the fraction of the maximum `Ndim`x`vol`
-* `params.csv` records the input parameters and total runtime for reference
+* `params.txt` records the input parameters and total runtime for reference
 
-Existing files in the output directory are overwritten.
-All of `accept.csv`, `action.csv`, `avecluster.csv`, `maxcluster.csv` and `numbonds.csv` also record the initial value of the observables listed above, and therefore should have `sweeps`+1 lines.
+Existing files in the output directory are overwritten.\
+The `csv` files are formatted as expected by [dygraphs](http://dygraphs.com) dynamical time-series plots.\
+All five include a header line for such plots, and all but `accept.csv` also record the initial value before the first sweep.\
+Therefore `accept.csv` should have `sweeps`+1 lines while the other four `csv` files should have `sweeps`+2 lines.
 
 TODO:
 * Add routines to save and load configurations, appending to output files rather than overwriting them
@@ -69,11 +71,11 @@ There are only two differences compared to the previous case.\
 First, we only work in the zero-quark canonical sector, to avoid the severe sign problem this algorithm would encounter at non-zero density.\
 Second, each sweep over `vol` updates is much simpler.  Each update chooses a random site, sets its spin to a random value (which can be the same as it currently has), and runs the MRT accept/reject test.
 
-As above, output is written to the following standard files in the output directory `out_dir` (which is created if it does not yet exist):
+As above, output is written to the following files in the output directory `out_dir` (which are created if they don't yet exist, overwritten if they do, and formatted as described above):
 * `accept.csv` records the average acceptance for each sweep
 * `action.csv` records the (total and volume-averaged) Potts model action (`gamma sum_<ij> delta_{s_i, s_j}`) after each sweep, where the sum is over all nearest-neighbor pairs of sites i and j
 * `magnet.csv` records the (total and volume-averaged) magnetization defined by assigning the three Potts states the numerical values {-1, 0, 1}
-* `params.csv` records the input parameters and total runtime for reference
+* `params.txt` records the input parameters and total runtime for reference
 
 TODO:
 * Check against known location of phase transition

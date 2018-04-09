@@ -25,7 +25,7 @@ Ndim = 3                      # Number of dimension
 Ndir = 2 * Ndim               # Number of directions (forward and backward)
 Nstate = 3                    # Hard-code three-state Potts model
 gamma = float(sys.argv[4])
-Nsweep = np.uint(sys.argv[5])
+Nsweep = int(sys.argv[5])
 seed = int(sys.argv[6])
 outdir = sys.argv[7]
 runtime = -time.time()
@@ -38,7 +38,7 @@ if not os.path.isdir(outdir):
   os.makedirs(outdir)
 
 # Save run parameters for posterity
-PARAMS = open(outdir + '/params.csv', 'w')
+PARAMS = open(outdir + '/params.txt', 'w')
 print >> PARAMS, "python", ' '.join(sys.argv)
 
 # Seed (Mersenne Twister) random number generator
@@ -78,11 +78,14 @@ for i in range(vol):
 # ------------------------------------------------------------------
 # Open files for output
 ACCEPT = open(outdir + '/accept.csv', 'w')
+print >> ACCEPT, "sweep,accept"
 MAGNET = open(outdir + '/magnet.csv', 'w')
+print >> MAGNET, "sweep,magnet_tot,magnet_rel"
 ACTION = open(outdir + '/action.csv', 'w')
+print >> ACTION, "sweep,action_tot,action_rel"
 
 # Print starting state
-# Note S = -gamma sum_<ij> \delta_{s_i, s_j}    # TODO: Check sign...
+# Note S = -gamma sum_<ij> delta_{s_i, s_j}    # TODO: Check sign...
 tot_spin = -float(vol)      # Converts spins to (-1, 0, 1, ..., Nstate - 2)
 tot_act = 0.0
 for i in range(vol):
@@ -94,11 +97,11 @@ for i in range(vol):
 
 # Print 'magnetization' and action,
 # for each including both total and average over lattice volume
-print >> MAGNET, tot_spin, tot_spin / float(vol)
-print >> ACTION, tot_act, tot_act / float(vol)
+print >> MAGNET, "0,%d,%.8g" % (tot_spin, tot_spin / float(vol))
+print >> ACTION, "0,%.8g,%.8g" % (tot_act, tot_act / float(vol))
 
 # Loop over sweeps, printing some basic data after each one
-for sweep in range(Nsweep):
+for sweep in range(1, Nsweep + 1):
   # Each sweep loops (randomly) over the lattice volume
   accept = 0.0                    # Initialize acceptance rate
   for i in range(vol):
@@ -144,9 +147,9 @@ for sweep in range(Nsweep):
 
   # Print acceptance, 'magnetization' and action,
   # for each including both total and average over lattice volume
-  print >> ACCEPT, "%.4g" % (accept / float(vol))
-  print >> MAGNET, "%d %.8g" % (tot_spin, tot_spin / float(vol))
-  print >> ACTION, "%d %.8g" % (tot_act, tot_act / float(vol))
+  print >> ACCEPT, "%d,%.4g" % (sweep, accept / float(vol))
+  print >> MAGNET, "%d,%d,%.8g" % (sweep, tot_spin, tot_spin / float(vol))
+  print >> ACTION, "%d,%.8g,%.8g" % (sweep, tot_act, tot_act / float(vol))
 # ------------------------------------------------------------------
 
 

@@ -106,7 +106,7 @@ def get_root(root, site):
 
 # ------------------------------------------------------------------
 # Determine sizes of all clusters, printing size of largest
-def count_clusters(root, numCluster, MAXCLUSTER):
+def count_clusters(root, numCluster, sweep, MAXCLUSTER):
   # Can have up to len(root) clusters -- maybe more than we need
   clusters = np.zeros(len(root), dtype=np.uint)
   for i in range(len(root)):
@@ -134,8 +134,9 @@ def count_clusters(root, numCluster, MAXCLUSTER):
     sys.exit(1)
 
   # Print largest cluster size, both absolute and as fraction of total volume
-  print >> MAXCLUSTER, np.amax(clusters),
-  print >> MAXCLUSTER, np.amax(clusters) / float(len(root))
+  tot = np.amax(clusters)
+  rel = np.amax(clusters) / float(len(root))
+  print >> MAXCLUSTER, "%d,%d,%.8g" % (sweep, tot, rel)
 # ------------------------------------------------------------------
 
 

@@ -25,7 +25,7 @@ Ndir = 2 * Ndim               # Number of directions (forward and backward)
 NB = np.uint(sys.argv[4])     # Number of baryons
 Nq = 3 * NB                   # Number of quarks
 gamma = float(sys.argv[5])
-Nsweep = np.uint(sys.argv[6])
+Nsweep = int(sys.argv[6])
 seed = int(sys.argv[7])
 outdir = sys.argv[8]
 runtime = -time.time()
@@ -44,7 +44,7 @@ if not os.path.isdir(outdir):
   os.makedirs(outdir)
 
 # Save run parameters for posterity
-PARAMS = open(outdir + '/params.csv', 'w')
+PARAMS = open(outdir + '/params.txt', 'w')
 print >> PARAMS, "python", ' '.join(sys.argv)
 
 # Quick sanity check: Make sure all NB baryons can fit on the lattice
@@ -128,24 +128,33 @@ check_Nq(occupation, Nq)
 # ------------------------------------------------------------------
 # Open files for output
 ACCEPT = open(outdir + '/accept.csv', 'w')
+print >> ACCEPT, "sweep,accept_mvB,accept_mvQ,accept_bond"
 MAXCLUSTER = open(outdir + '/maxcluster.csv', 'w')
+print >> MAXCLUSTER, "sweep,max_tot,max_rel"
 AVECLUSTER = open(outdir + '/avecluster.csv', 'w')
+print >> AVECLUSTER, "sweep,ave_tot,ave_rel"
 NUMBONDS = open(outdir + '/numbonds.csv', 'w')
+print >> NUMBONDS, "sweep,NB_tot,NB_rel"
 ACTION = open(outdir + '/action.csv', 'w')
+print >> ACTION, "sweep,action_tot,action_rel"
 
 # Print starting state
-count_clusters(root, numCluster, MAXCLUSTER)
-print >> AVECLUSTER, float(vol) / float(numCluster),
-print >> AVECLUSTER, 1.0 / float(numCluster)
-print >> NUMBONDS, float(numBond) / float(vol * Ndim)
+count_clusters(root, numCluster, 0, MAXCLUSTER)
+
+tot = float(vol) / float(numCluster)
+rel = 1.0 / float(numCluster)
+print >> AVECLUSTER, "0,%.8g,%.8g" % (tot, rel)
+
+rel = float(numBond) / float(vol * Ndim)
+print >> NUMBONDS, "0,%d,%.8g" % (numBond, rel)
 if not gamma == 0:
   tr = float(numBond) / add_prob
-  print >> ACTION, tr, tr
+  print >> ACTION, "0,%.8g,%.8g" % (tr, tr / float(vol))
 else:
-  print >> ACTION, 0.0, 0.0
+  print >> ACTION, "0,0.0,0.0"
 
 # Loop over sweeps, printing some basic data after each one
-for sweep in range(Nsweep):
+for sweep in range(1, Nsweep + 1):
   # Each sweep loops (randomly) over the lattice volume
   accept = [0.0, 0.0, 0.0]        # Initialize acceptance rate
   for i in range(vol):
@@ -252,35 +261,38 @@ for sweep in range(Nsweep):
   # Print some basic data after each sweep
   # (Can also run after each update if speed and output size aren't issues)
   # First print average acceptances for the sweep
-  print >> ACCEPT, "%.4g" % (accept[0] / float(vol)),
-  print >> ACCEPT, "%.4g" % (accept[1] / float(vol)),
-  print >> ACCEPT, "%.4g" % (accept[2] / float(vol))
+  aB = accept[0] / float(vol)
+  aQ = accept[1] / float(vol)
+  aBond = accept[2] / float(vol)
+  print >> ACCEPT, "%d,%.4g,%.4g,%.4g" % (sweep, aB, aQ, aBond)
 
   # Sanity check: make sure our total occupation number remains correct
   check_Nq(occupation, Nq)
 
   # Make sure our count of clusters remains correct
   # count_clusters prints size of largest cluster
-  count_clusters(root, numCluster, MAXCLUSTER)
+  count_clusters(root, numCluster, sweep, MAXCLUSTER)
 
   # Print average cluster size, both absolute and as fraction of total volume
-  print >> AVECLUSTER, "%.8g" % (float(vol) / float(numCluster)),
-  print >> AVECLUSTER, "%.8g" % (1.0 / float(numCluster))
+  tot = float(vol) / float(numCluster)
+  rel = 1.0 / float(numCluster)
+  print >> AVECLUSTER, "%d,%.8g,%.8g" % (sweep, tot, rel)
 
   # Make sure our count of bonds remains correct
   count_bonds(bond, numBond)
 
   # Print number of bonds, both absolute and as fraction of the total
-  print >> NUMBONDS, "%d %.8g" % (numBond, float(numBond) / float(vol * Ndim))
+  rel = float(numBond) / float(vol * Ndim)
+  print >> NUMBONDS, "%d,%d,%.8g" % (sweep, numBond, rel)
 
   # Print action as total number of bonds divided by (1 - exp_mga)
   # Again, first total action then average divided by total volume
   # Note that numBond = 0 when gamma = 0
   if not gamma == 0:
     tr = float(numBond) / add_prob
-    print >> ACTION, "%.8g %.8g" % (tr, tr / float(vol))
+    print >> ACTION, "%d,%.8g,%.8g" % (sweep, tr, tr / float(vol))
   else:
-    print >> ACTION, 0.0, 0.0
+    print >> ACTION, "0,0.0,0.0"
 # ------------------------------------------------------------------
 
 
