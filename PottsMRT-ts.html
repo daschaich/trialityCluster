@@ -1,0 +1,85 @@
+<html><head>
+<script type="text/javascript" src="http://www-hep.colorado.edu/~schaich/dygraph-combined.js"></script>
+<style type="text/css">
+  #main{
+    margin-right:19em;
+    position:relative;
+    min-height:0
+  }
+  #main h2 {background-color:#f0f0f0}
+  h1, h2, h3 {margin-bottom:1em}
+  h2, h3, h4 a, h5 a {padding:3px 10px}
+  h2, h3, h4, h5 {font-size:1em}
+</style>
+<title>Potts model Rosenbluth--Teller time-series plots</title>
+</head>
+<body>
+<div id="main">
+  <div style="width:880px; height:330px;">
+    <table>
+      <tr><th>Magnetization</th><th>Action</th></tr>
+      <tr>
+        <td style="width:400px; height:300px;">
+          <div id="magnet"></div>
+          <script type="text/javascript">
+            g = new Dygraph(document.getElementById("magnet"),
+                            "magnet.csv",
+                            { rollPeriod: 5,
+                              colors: ["green", "red", "blue"],
+                              showRoller: true,
+                              valueRange: [0, 1.01],
+                              yValueFormatter: function(x) {
+                                var shift = Math.pow(10, 3)
+                                return Math.round(x * shift) / shift
+                              },
+                            });
+          </script>
+        </td>
+        <td style="width:400px; height:300px;">
+          <div id="action"></div>
+          <script type="text/javascript">
+            g = new Dygraph(document.getElementById("action"),
+                            "action.csv",
+                            { rollPeriod: 5,
+                              colors: ["red", "blue"],
+                              visibility: [false, true],
+                              showRoller: true,
+                              yValueFormatter: function(x) {
+                                var shift = Math.pow(10, 3)
+                                return Math.round(x * shift) / shift
+                              },
+                            });
+          </script>
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br>
+  <div style="width:880px; height:330px;">
+    <table>
+      <tr><th>Acceptance</th><th>Intentionally left blank</th></tr>
+      <tr>
+        <td style="width:400px; height:300px;">
+          <div id="accept"></div>
+          <script type="text/javascript">
+            g = new Dygraph(document.getElementById("accept"),
+                            "accept.csv",
+                            { rollPeriod: 5,
+                              colors: ["red"],
+                              valueRange: [0, 1.01],
+                              yValueFormatter: function(x) {
+                                var shift = Math.pow(10, 3)
+                                return Math.round(x * shift) / shift
+                              },
+                            });
+          </script>
+        </td>
+        <td style="width:400px; height:300px;">
+        </td>
+      </tr>
+    </table>
+  </div>
+  <br><br><p align="right"><a href="#top">Return to top</a></p>
+</div>
+</body>
+</html>
