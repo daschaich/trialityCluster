@@ -79,7 +79,6 @@ As above, output is written to the following files in the output directory `out_
 
 TODO:
 * Add routines to save and load configurations, appending to output files rather than overwriting them
-* Check against cluster algorithm (in particular checking gamma vs. -gamma since the two codes produce actions with opposite signs)
 
 ## Triality cluster algorithm for SU(3) variables
 
