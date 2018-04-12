@@ -51,7 +51,7 @@ Therefore `accept.csv` should have `sweeps`+1 lines while the other four `csv` f
 
 TODO:
 * Add routines to save and load configurations, appending to output files rather than overwriting them
-* Check zero-density results against local update algorithm and against known location of phase transition
+* Check zero-density results against local update algorithm
 * Reproduce results in arXiv:1712.07585 (will require additional update steps and/or reweighting)
 
 ## Local update algorithm for 3d three-state Potts model
@@ -78,7 +78,6 @@ As above, output is written to the following files in the output directory `out_
 * `params.txt` records the input parameters and total runtime for reference
 
 TODO:
-* Check against known location of phase transition
 * Add routines to save and load configurations, appending to output files rather than overwriting them
 * Check against cluster algorithm (in particular checking gamma vs. -gamma since the two codes produce actions with opposite signs)
 
