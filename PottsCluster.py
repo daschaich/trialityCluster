@@ -20,6 +20,7 @@ nx = np.uint(sys.argv[1])
 ny = np.uint(sys.argv[2])
 nz = np.uint(sys.argv[3])
 vol = nx * ny * nz
+sys.setrecursionlimit(vol)    # Default is 10^3, reached in deconfined phase
 Ndim = 3                      # Number of dimension
 Ndir = 2 * Ndim               # Number of directions (forward and backward)
 NB = np.uint(sys.argv[4])     # Number of baryons
