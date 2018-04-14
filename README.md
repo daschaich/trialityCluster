@@ -51,7 +51,6 @@ Therefore `accept.csv` should have `sweeps`+1 lines while the other four `csv` f
 
 TODO:
 * Add routines to save and load configurations, appending to output files rather than overwriting them
-* Check zero-density results against local update algorithm
 * Reproduce results in arXiv:1712.07585 (will require additional update steps and/or reweighting)
 
 ## Local update algorithm for 3d three-state Potts model
