@@ -20,7 +20,6 @@ nx = np.uint(sys.argv[1])
 ny = np.uint(sys.argv[2])
 nz = np.uint(sys.argv[3])
 vol = nx * ny * nz
-sys.setrecursionlimit(vol)    # Default is 10^3, reached in deconfined phase
 Ndim = 3                      # Number of dimension
 Ndir = 2 * Ndim               # Number of directions (forward and backward)
 NB = np.uint(sys.argv[4])     # Number of baryons
@@ -31,8 +30,15 @@ seed = int(sys.argv[7])
 outdir = sys.argv[8]
 runtime = -time.time()
 
+# In deconfined phase, a single cluster can fill the entire lattice
+# So the recursive build_cluster routine in utils.py
+# can easily exceed the default 10^3 recursion limit
+# Need a little over vol in total
+# since build_cluster calls follow_bond which then calls site_index
+sys.setrecursionlimit(int(vol + 2))
+
 # Compute and save these constant floats
-exp_mga = np.exp(-gamma)
+exp_mga = np.exp(-gamma)          # Also bond removal probability
 add_prob = 1.0 - exp_mga
 split_prob = 3.0 * exp_mga / (1.0 + 2.0 * exp_mga)
 merge_prob = add_prob / (1.0 + 2.0 * exp_mga)
@@ -208,9 +214,13 @@ for sweep in range(1, Nsweep + 1):
       #       without building entire cluster
       ran_cluster = []
       build_cluster(bond, ran, ran_cluster, lattice)
-      if neigh in ran_cluster:        # No change in clusters, so accept
-        numBond -= np.uint(1)
-        accept[2] += 1.0
+      # If no change in clusters, accept with probability exp_mga
+      if neigh in ran_cluster:
+        if prng.uniform(0, 1) < exp_mga:
+          numBond -= np.uint(1)
+          accept[2] += 1.0
+        else:
+          bond[ran][ran_dir] = True       # Reject!
 
       # If the cluster will be split we need to check the occupation numbers
       else:
