@@ -210,12 +210,10 @@ for sweep in range(1, Nsweep + 1):
       bond[ran][ran_dir] = False      # Consequences to be checked...
 
       # Build cluster from ran, see if neigh is still in it
-      # TODO: Should be a cheaper way just to check connectivity
-      #       without building entire cluster
-      ran_cluster = []
-      build_cluster(bond, ran, ran_cluster, lattice)
       # If no change in clusters, accept with probability exp_mga
-      if neigh in ran_cluster:
+      ran_cluster = []
+      connect = check_connect(bond, ran, ran_cluster, lattice, neigh)
+      if connect > 0:         # No change in clusters
         if prng.uniform(0, 1) < exp_mga:
           numBond -= np.uint(1)
           accept[2] += 1.0
@@ -223,7 +221,8 @@ for sweep in range(1, Nsweep + 1):
           bond[ran][ran_dir] = True       # Reject!
 
       # If the cluster will be split we need to check the occupation numbers
-      else:
+      # connect<0 means that check_connect built the complete ran_cluster
+      else:     # Cluster will be split
         ran_Nq = check_occupation(occupation, ran_cluster)
         if not np.mod(ran_Nq, 3) == 0:
           bond[ran][ran_dir] = True       # Reject!

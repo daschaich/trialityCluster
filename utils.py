@@ -158,13 +158,12 @@ def count_bonds(bond, numBonds):
 
 
 # ------------------------------------------------------------------
-# Build cluster by following all bonds from starting site
+# Build cluster by recursively following all bonds
 def build_cluster(bond, start, cluster, lattice):
-  # Add starting site
+  # Add this site to the cluster
   cluster.append(start)
 
-  # Recursively visit all neighbors of starting site
-  # that are not yet in the cluster
+  # Recursively check neighbors that are not yet in the cluster
   # Forward directions
   for direction in range(lattice['Ndim']):
     if bond[start][direction]:
@@ -178,4 +177,44 @@ def build_cluster(bond, start, cluster, lattice):
     if bond[tocheck][direction]:
       if not tocheck in cluster:
         build_cluster(bond, tocheck, cluster, lattice)
+# ------------------------------------------------------------------
+
+
+
+# ------------------------------------------------------------------
+# Check if target site is in the same cluster as start
+# Same recursive approach as build_cluster above
+# But now return as soon as target is found, to be more efficient
+# Returning +1 means the cluster remains connected
+# Returning -1 means the full cluster has been built without hitting target
+def check_connect(bond, start, cluster, lattice, target):
+  # We would have returned if this site is our target
+  # so we can safely add it to the cluster
+  cluster.append(start)
+
+  # Recursively check neighbors that are not yet in the cluster
+  # Forward directions
+  for direction in range(lattice['Ndim']):
+    if bond[start][direction]:
+      tovisit = follow_bond(start, direction, lattice)
+      if tovisit == target:
+        return 1
+      if not tovisit in cluster:
+        test = check_connect(bond, tovisit, cluster, lattice, target)
+        if test > 0:      # Otherwise keep going
+          return test
+
+  # Backward directions -- need to check bonds at neighboring sites
+  for direction in range(lattice['Ndim']):
+    tocheck = follow_bond(start, 3 + direction, lattice)
+    if bond[tocheck][direction]:
+      if tocheck == target:
+        return 1
+      if not tocheck in cluster:
+        test = check_connect(bond, tocheck, cluster, lattice, target)
+        if test > 0:      # Otherwise keep going
+          return test
+
+  # Finished adding to cluster without encountering target site
+  return -1
 # ------------------------------------------------------------------
