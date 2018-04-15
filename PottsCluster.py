@@ -42,6 +42,7 @@ exp_mga = np.exp(-gamma)          # Also bond removal probability
 add_prob = 1.0 - exp_mga
 split_prob = 3.0 * exp_mga / (1.0 + 2.0 * exp_mga)
 merge_prob = add_prob / (1.0 + 2.0 * exp_mga)
+act_frac = -1.0 * gamma / add_prob          # Factor for the action
 
 # TODO: Utilities for loading bond configuration and occupation numbers...
 
@@ -141,7 +142,7 @@ print >> MAXCLUSTER, "sweep,max_tot,max_rel"
 AVECLUSTER = open(outdir + '/avecluster.csv', 'w')
 print >> AVECLUSTER, "sweep,ave_tot,ave_rel"
 NUMBONDS = open(outdir + '/numbonds.csv', 'w')
-print >> NUMBONDS, "sweep,NB_tot,NB_rel"
+print >> NUMBONDS, "sweep,nb_tot,nb_rel"
 ACTION = open(outdir + '/action.csv', 'w')
 print >> ACTION, "sweep,action_tot,action_rel"
 
@@ -295,11 +296,12 @@ for sweep in range(1, Nsweep + 1):
   rel = float(numBond) / float(vol * Ndim)
   print >> NUMBONDS, "%d,%d,%.8g" % (sweep, numBond, rel)
 
-  # Print action as total number of bonds divided by (1 - exp_mga)
+  # Print action S = -gamma * numBond / (1 - exp[-gamma])
+  # (Derived in Eq. 3.28 of Philippe Widmer's thesis)
   # Again, first total action then average divided by total volume
   # Note that numBond = 0 when gamma = 0
   if not gamma == 0:
-    tr = float(numBond) / add_prob
+    tr = float(numBond) * act_frac
     print >> ACTION, "%d,%.8g,%.8g" % (sweep, tr, tr / float(vol))
   else:
     print >> ACTION, "0,0.0,0.0"

@@ -85,15 +85,14 @@ ACTION = open(outdir + '/action.csv', 'w')
 print >> ACTION, "sweep,action_tot,action_rel"
 
 # Print starting state
-# Note S = gamma sum_<ij> delta_{s_i, s_j}    # TODO: Check sign...
+# Note S = -gamma sum_<ij> delta_{s_i, s_j}    # TODO: Check sign...
 magnet = [0, 0, 0]
 tot_act = 0.0
 for i in range(vol):
   magnet[config[i]] += 1    # Count how many sites have each value
   for mu in range(Ndim):    # Only the forward neighbors
-    neigh = config[follow_bond(i, mu, lattice)]
-    if config[i] == neigh:
-      tot_act += gamma
+    if config[i] == config[follow_bond(i, mu, lattice)]:
+      tot_act -= gamma
 
 # Print 'magnetization' and action,
 # for each including both total and average over lattice volume
@@ -115,25 +114,23 @@ for sweep in range(1, Nsweep + 1):
     new = prng.randint(0, Nstate)   # Proposed new state at site ran
 
     # Compute change in energy, if non-zero
-    # TODO: Might be able to do this more efficiently
-    # With weight exp[-S] = exp[-gamma sum_<ij> delta_{s_i, s_j}]
-    #   accept with probability exp[newE - curE]
+    # With weight exp[-S] = exp[gamma sum_<ij> delta_{s_i, s_j}]
+    #   accept with probability exp[diff] = exp[oldE - newE]
     if new == cur:
       accept += 1.0
-    else:
-      curE = 0.0
-      newE = 0.0
+    else:         # We know new != cur
+      diff = 0.0
       for mu in range(Ndir):
         neigh = config[follow_bond(ran, mu, lattice)]
-        if cur == neigh:
-          curE += gamma
         if new == neigh:
-          newE += gamma
+          diff += gamma
+        elif cur == neigh:
+          diff -= gamma
 
-      if newE > curE:
+      if diff > 0:
         config[ran] = new
         accept += 1.0
-      elif prng.uniform(0, 1) < np.exp(newE - curE):
+      elif prng.uniform(0, 1) < np.exp(diff):
         config[ran] = new
         accept += 1.0
 
@@ -144,9 +141,8 @@ for sweep in range(1, Nsweep + 1):
   for i in range(vol):
     magnet[config[i]] += 1    # Count how many sites have each value
     for mu in range(Ndim):    # Only the forward neighbors
-      neigh = config[follow_bond(i, mu, lattice)]
-      if config[i] == neigh:
-        tot_act += gamma
+      if config[i] == config[follow_bond(i, mu, lattice)]:
+        tot_act -= gamma
 
   # Print acceptance, 'magnetization' and action,
   # for each including both total and average over lattice volume
