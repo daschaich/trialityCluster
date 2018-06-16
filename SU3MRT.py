@@ -15,7 +15,7 @@ from utils import follow_bond
 # and directory for output data
 if len(sys.argv) < 9:
   print "Usage:", str(sys.argv[0]), "<nx> <ny> <nz> <nt>"
-  print "                     <beta> <sweeps> <RNG seed> <out_dir>"
+  print "                   <beta> <sweeps> <RNG seed> <out_dir>"
   sys.exit(1)
 nx = np.uint(sys.argv[1])
 ny = np.uint(sys.argv[2])

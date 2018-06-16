@@ -14,7 +14,7 @@ from utils import *
 # and directory for output data
 if len(sys.argv) < 10:
   print "Usage:", str(sys.argv[0]), "<nx> <ny> <nz> <nt> <#baryons>"
-  print "                     <beta> <sweeps> <random_seed> <out_dir>"
+  print "                   <beta> <sweeps> <random_seed> <out_dir>"
   sys.exit(1)
 nx = np.uint(sys.argv[1])
 ny = np.uint(sys.argv[2])
